@@ -1,3 +1,3 @@
-module proxy
+module easyproxy
 
 go 1.14

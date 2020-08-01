@@ -89,13 +89,16 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	var addr = flag.String("addr", "127.0.0.1:8080", "The addr of the application.")
+	var from = flag.String("from", "127.0.0.1:8080", "The address listen to")
+	var to = flag.String("to", "example.com", "The target proxy to")
 	flag.Parse()
+
+	log.Println("easyproxy is proxying request from", *from, "to", *to)
 
 	handler := &proxy{}
 
-	log.Println("Starting proxy server on", *addr)
-	if err := http.ListenAndServe(*addr, handler); err != nil {
+	log.Println("Starting proxy server on", *from)
+	if err := http.ListenAndServe(*from, handler); err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}
 }
