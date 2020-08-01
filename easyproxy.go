@@ -2,10 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -89,6 +91,15 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
+
+	args := os.Args
+	if len(args) == 1 {
+		fmt.Println("easylog\n" +
+			"    --from <host-address> \n" +
+			"    --to <target-address>")
+		return
+	}
+
 	var from = flag.String("from", "127.0.0.1:8080", "The address listen to")
 	var to = flag.String("to", "example.com", "The target proxy to")
 	flag.Parse()
