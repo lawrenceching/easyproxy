@@ -49,6 +49,7 @@ func appendHostToXForwardHeader(header http.Header, host string) {
 }
 
 type proxy struct {
+	destination string
 }
 
 func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
@@ -66,7 +67,7 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	//http: Request.RequestURI can't be set in client requests.
 	//http://golang.org/src/pkg/net/http/client.go
 	//req.RequestURI = ""
-	req, err := http.NewRequest("GET", "http://example.com", nil)
+	req, err := http.NewRequest("GET", p.destination, nil)
 
 	delHopHeaders(req.Header)
 
@@ -106,7 +107,7 @@ func main() {
 
 	log.Println("easyproxy is proxying request from", *from, "to", *to)
 
-	handler := &proxy{}
+	handler := &proxy{destination: *to}
 
 	log.Println("Starting proxy server on", *from)
 	if err := http.ListenAndServe(*from, handler); err != nil {
