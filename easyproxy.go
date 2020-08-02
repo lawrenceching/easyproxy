@@ -67,7 +67,9 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	//http: Request.RequestURI can't be set in client requests.
 	//http://golang.org/src/pkg/net/http/client.go
 	//req.RequestURI = ""
-	req, err := http.NewRequest("GET", p.destination, nil)
+	method := req.Method
+	body := req.Body
+	req, err := http.NewRequest(method, p.destination, body)
 
 	delHopHeaders(req.Header)
 
@@ -91,6 +93,15 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	io.Copy(wr, resp.Body)
 }
 
+func StartProxy(from string, to string) {
+	handler := &proxy{destination: to}
+
+	log.Println("Starting proxy server on", from)
+	if err := http.ListenAndServe(from, handler); err != nil {
+		log.Fatal("ListenAndServe:", err)
+	}
+}
+
 func main() {
 
 	args := os.Args
@@ -107,10 +118,5 @@ func main() {
 
 	log.Println("easyproxy is proxying request from", *from, "to", *to)
 
-	handler := &proxy{destination: *to}
-
-	log.Println("Starting proxy server on", *from)
-	if err := http.ListenAndServe(*from, handler); err != nil {
-		log.Fatal("ListenAndServe:", err)
-	}
+	StartProxy(*from, *to)
 }
