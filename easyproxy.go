@@ -95,7 +95,7 @@ func main() {
 
 	args := os.Args
 	if len(args) == 1 {
-		fmt.Println("easylog\n" +
+		fmt.Println("easyproxy\n" +
 			"    --from <host-address> \n" +
 			"    --to <target-address>")
 		return
