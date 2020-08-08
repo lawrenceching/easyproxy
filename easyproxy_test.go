@@ -7,12 +7,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestProxySupportHttpGet(t *testing.T) {
+func TestMain(m *testing.M) {
 	server := createTestServer()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
@@ -24,15 +25,25 @@ func TestProxySupportHttpGet(t *testing.T) {
 	defer server.Shutdown(ctx)
 
 	proxy := CreateProxy("localhost:8080", "http://localhost:9090")
-	go proxy.ListenAndServe()
+	go func() {
+		_ = proxy.ListenAndServe()
+	}()
 	defer proxy.Shutdown(ctx)
+
+	time.Sleep(10 * time.Millisecond)
+
+	os.Exit(m.Run())
+}
+
+func TestProxySupportHttpGet(t *testing.T) {
 
 	reqHeaders := make(map[string][]string)
 	reqHeaders["Content-Type"] = []string{"application/json"}
 	resp, err := sendHttpRequest("http://localhost:8080", "GET", reqHeaders)
 
 	if err != nil {
-		t.Error()
+		t.Error("Unable to send http request because ", err)
+		return
 	}
 
 	var data map[string]interface{}
@@ -58,52 +69,27 @@ func TestProxySupportHttpGet(t *testing.T) {
 }
 
 func TestProxySupportHttpPost(t *testing.T) {
-	server := createTestServer()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-	go func() {
-		_ = server.ListenAndServe()
-	}()
-
-	defer cancel()
-
-	proxy := CreateProxy("localhost:8080", "http://localhost:9090")
-	go proxy.ListenAndServe()
-	defer proxy.Shutdown(ctx)
-
 	resp, err := httpPost("http://localhost:8080")
 
 	if err != nil {
-		t.Error()
+		t.Error(err)
 	}
 
 	expected := "{\"method\":\"POST\",\"body\":\"id=123\\u0026key=Value\",\"headers\":{\"Accept-Encoding\":[\"gzip\"],\"Content-Type\":[\"application/x-www-form-urlencoded\"],\"User-Agent\":[\"Go-http-client/1.1\"]}}"
-	if expected != *resp {
-		t.Error("Expected", expected, "but got", *resp)
+	if resp == nil {
+		t.Error("resp is nil")
 	}
 
-	server.Shutdown(ctx)
+	if resp != nil && expected != *resp {
+		t.Error("Expected", expected, "but got", *resp)
+	}
 }
 
 func TestProxySupportHttpPut(t *testing.T) {
-	server := createTestServer()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-	go func() {
-		_ = server.ListenAndServe()
-	}()
-
-	defer cancel()
-	defer server.Shutdown(ctx)
-
-	proxy := CreateProxy("localhost:8080", "http://localhost:9090")
-	go proxy.ListenAndServe()
-	defer proxy.Shutdown(ctx)
-
 	resp, err := httpPut("http://localhost:8080")
 
 	if err != nil {
-		t.Error()
+		t.Error(err)
 	}
 
 	expected := "{\"method\":\"PUT\",\"body\":\"\",\"headers\":{\"Accept-Encoding\":[\"gzip\"],\"Content-Length\":[\"0\"],\"Content-Type\":[\"application/json; charset=utf-8\"],\"User-Agent\":[\"Go-http-client/1.1\"]}}"
@@ -180,6 +166,10 @@ func sendHttpRequest(address string, method string, headers map[string][]string)
 	}
 
 	resp, err := client.Do(req)
+
+	if err != nil {
+		return nil, err
+	}
 
 	defer resp.Body.Close()
 
