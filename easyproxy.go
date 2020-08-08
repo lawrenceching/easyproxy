@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -53,23 +52,17 @@ type proxy struct {
 }
 
 func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	log.Println(req.RemoteAddr, " ", req.Method, " ", req.URL)
+	DEBUG := os.Getenv("EASYPROXY_DEBUG")
 
-	//if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
-	//	msg := "unsupported protocal scheme "+req.URL.Scheme
-	//	http.Error(wr, msg, http.StatusBadRequest)
-	//	log.Println(msg)
-	//	return
-	//}
+	if DEBUG == "true" {
+		log.Println("[" + req.Method + "] " + req.RemoteAddr + req.RequestURI + " -> " + p.destination + req.RequestURI)
+	}
 
 	client := &http.Client{}
 
-	//http: Request.RequestURI can't be set in client requests.
-	//http://golang.org/src/pkg/net/http/client.go
-	//req.RequestURI = ""
 	method := req.Method
 	body := req.Body
-	reqToProxy, err := http.NewRequest(method, p.destination, body)
+	reqToProxy, err := http.NewRequest(method, p.destination+req.RequestURI, body)
 
 	delHopHeaders(req.Header)
 
@@ -90,30 +83,29 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	log.Println(req.RemoteAddr, " ", resp.Status)
-
 	delHopHeaders(resp.Header)
 
 	copyHeader(wr.Header(), resp.Header)
 	wr.WriteHeader(resp.StatusCode)
-	io.Copy(wr, resp.Body)
+
+	buf := make([]byte, 1024)
+	len := 1
+	for len != 0 {
+		l, _ := resp.Body.Read(buf)
+		len = l
+		wr.Write(buf[:len])
+	}
 }
 
 func CreateProxy(from string, to string) http.Server {
 	handler := &proxy{destination: to}
-	fmt.Println("HTTP server is listening on", from)
 	server := http.Server{Addr: from, Handler: handler}
 	return server
 }
 
 func StartProxy(from string, to string) {
-
 	server := CreateProxy(from, to)
-
-	log.Println("Starting proxy server on", from)
-
 	server.ListenAndServe()
-
 }
 
 func main() {
