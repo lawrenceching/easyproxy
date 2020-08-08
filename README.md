@@ -11,7 +11,4 @@ easyproxy --from 0.0.0.0:8080 --to example.com
 
 # Release
 
-Version | OS | Link
-:----------- | :-----------: | -----------:
- 0.0.1        |     Darwin    |       https://lawrenceching-generic.pkg.coding.net/easyproxy/dist/easyproxy-Darwin.zip?version=0.0.1
- 0.0.1        |     Linux    |       https://lawrenceching-generic.pkg.coding.net/easyproxy/dist/easyproxy-Linux.zip?version=0.0.1
+https://github.com/lawrenceching/easyproxy/releases
