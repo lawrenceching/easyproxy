@@ -69,15 +69,21 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	//req.RequestURI = ""
 	method := req.Method
 	body := req.Body
-	req, err := http.NewRequest(method, p.destination, body)
+	reqToProxy, err := http.NewRequest(method, p.destination, body)
 
 	delHopHeaders(req.Header)
+
+	for k, v := range req.Header {
+		for _, h := range v {
+			reqToProxy.Header.Add(k, h)
+		}
+	}
 
 	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
 		appendHostToXForwardHeader(req.Header, clientIP)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(reqToProxy)
 	if err != nil {
 		http.Error(wr, "Server Error", http.StatusInternalServerError)
 		log.Fatal("ServeHTTP:", err)
@@ -93,13 +99,21 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	io.Copy(wr, resp.Body)
 }
 
-func StartProxy(from string, to string) {
+func CreateProxy(from string, to string) http.Server {
 	handler := &proxy{destination: to}
+	fmt.Println("HTTP server is listening on", from)
+	server := http.Server{Addr: from, Handler: handler}
+	return server
+}
+
+func StartProxy(from string, to string) {
+
+	server := CreateProxy(from, to)
 
 	log.Println("Starting proxy server on", from)
-	if err := http.ListenAndServe(from, handler); err != nil {
-		log.Fatal("ListenAndServe:", err)
-	}
+
+	server.ListenAndServe()
+
 }
 
 func main() {
