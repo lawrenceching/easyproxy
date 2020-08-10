@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -49,6 +50,7 @@ func appendHostToXForwardHeader(header http.Header, host string) {
 
 type proxy struct {
 	destination string
+	config ProxyConfig
 }
 
 func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
@@ -56,6 +58,24 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 
 	if DEBUG == "true" {
 		log.Println("[" + req.Method + "] " + req.RemoteAddr + req.RequestURI + " -> " + p.destination + req.RequestURI)
+	}
+
+	if p.config.isBasicAuthenticationEnabled == true {
+		authorization := req.Header.Get("Authorization")
+		log.Println("Authorization:", authorization)
+
+		if authorization == "" {
+			wr.Header().Add("WWW-Authenticate", "Basic realm=\"Login\"")
+			wr.WriteHeader(401)
+			return
+		} else {
+			//TODO: validate the authorization
+			if len(authorization) <= 0 {
+				wr.Header().Add("WWW-Authenticate", "Basic realm=\"Login\"")
+				wr.WriteHeader(401)
+				return
+			}
+		}
 	}
 
 	client := &http.Client{}
@@ -97,15 +117,19 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func CreateProxy(from string, to string) http.Server {
-	handler := &proxy{destination: to}
+func CreateProxy(from string, to string, config ProxyConfig) http.Server {
+	handler := &proxy{destination: to, config: config}
 	server := http.Server{Addr: from, Handler: handler}
 	return server
 }
 
-func StartProxy(from string, to string) {
-	server := CreateProxy(from, to)
+func StartProxy(from string, to string, config ProxyConfig) {
+	server := CreateProxy(from, to, config)
 	server.ListenAndServe()
+}
+
+type ProxyConfig struct {
+	isBasicAuthenticationEnabled bool
 }
 
 func main() {
@@ -114,15 +138,28 @@ func main() {
 	if len(args) == 1 {
 		fmt.Println("easyproxy\n" +
 			"    --from <host-address> \n" +
-			"    --to <target-address>")
+			"    --to <target-address> \n" +
+			"    --basicauth")
 		return
 	}
 
 	var from = flag.String("from", "127.0.0.1:8080", "The address listen to")
 	var to = flag.String("to", "example.com", "The target proxy to")
+	var basicauth = flag.String("basicauth", "false", "To enable basic authentication")
 	flag.Parse()
 
 	log.Println("easyproxy is proxying request from", *from, "to", *to)
 
-	StartProxy(*from, *to)
+
+	isBasicAuthenticationEnabled, err := strconv.ParseBool(*basicauth)
+	if err != nil {
+		log.Fatalln("Value for basicauth is not boolean")
+		return
+	}
+
+	var config = ProxyConfig{
+		isBasicAuthenticationEnabled: isBasicAuthenticationEnabled,
+	}
+
+	StartProxy(*from, *to, config)
 }
