@@ -1,13 +1,13 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -50,7 +50,7 @@ func appendHostToXForwardHeader(header http.Header, host string) {
 
 type proxy struct {
 	destination string
-	config ProxyConfig
+	config      ProxyConfig
 }
 
 func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
@@ -62,15 +62,23 @@ func (p *proxy) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 
 	if p.config.isBasicAuthenticationEnabled == true {
 		authorization := req.Header.Get("Authorization")
-		log.Println("Authorization:", authorization)
 
 		if authorization == "" {
 			wr.Header().Add("WWW-Authenticate", "Basic realm=\"Login\"")
 			wr.WriteHeader(401)
 			return
 		} else {
-			//TODO: validate the authorization
-			if len(authorization) <= 0 {
+			words := strings.Split(authorization, " ")
+			authType := words[0]
+			credential := words[1]
+
+			if authType != "Basic" {
+				wr.Write([]byte("Unsupported authentication type: " + authType))
+				wr.WriteHeader(400)
+				return
+			}
+
+			if _, ok := p.config.basicAuthenticationCredentials[credential]; !ok {
 				wr.Header().Add("WWW-Authenticate", "Basic realm=\"Login\"")
 				wr.WriteHeader(401)
 				return
@@ -129,7 +137,8 @@ func StartProxy(from string, to string, config ProxyConfig) {
 }
 
 type ProxyConfig struct {
-	isBasicAuthenticationEnabled bool
+	isBasicAuthenticationEnabled   bool
+	basicAuthenticationCredentials map[string]string
 }
 
 func main() {
@@ -145,20 +154,19 @@ func main() {
 
 	var from = flag.String("from", "127.0.0.1:8080", "The address listen to")
 	var to = flag.String("to", "example.com", "The target proxy to")
-	var basicauth = flag.String("basicauth", "false", "To enable basic authentication")
+	var basicAuthCredential = flag.String("basicauth", "", "Basic authentication credential in \"username:password\" format")
 	flag.Parse()
 
 	log.Println("easyproxy is proxying request from", *from, "to", *to)
 
-
-	isBasicAuthenticationEnabled, err := strconv.ParseBool(*basicauth)
-	if err != nil {
-		log.Fatalln("Value for basicauth is not boolean")
-		return
+	isBasicAuthenticationEnabled := len(*basicAuthCredential) > 0
+	credentials := map[string]string{
+		base64.StdEncoding.EncodeToString([]byte(*basicAuthCredential)): "",
 	}
 
 	var config = ProxyConfig{
-		isBasicAuthenticationEnabled: isBasicAuthenticationEnabled,
+		isBasicAuthenticationEnabled:   isBasicAuthenticationEnabled,
+		basicAuthenticationCredentials: credentials,
 	}
 
 	StartProxy(*from, *to, config)

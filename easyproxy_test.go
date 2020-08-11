@@ -7,13 +7,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestMain(m *testing.M) {
+func TestBasicFunctionality(t *testing.T) {
+
 	server := createTestServer()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
@@ -24,7 +24,11 @@ func TestMain(m *testing.M) {
 	defer cancel()
 	defer server.Shutdown(ctx)
 
-	proxy := CreateProxy("localhost:8080", "http://localhost:9090")
+	config := ProxyConfig{
+		isBasicAuthenticationEnabled: false,
+	}
+
+	proxy := CreateProxy("localhost:8080", "http://localhost:9090", config)
 	go func() {
 		_ = proxy.ListenAndServe()
 	}()
@@ -32,10 +36,12 @@ func TestMain(m *testing.M) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	os.Exit(m.Run())
+	t.Run("testProxySupportHttpGet", testProxySupportHttpGet)
+	t.Run("testProxySupportHttpPost", testProxySupportHttpPost)
+	t.Run("testProxySupportHttpPut", testProxySupportHttpPut)
 }
 
-func TestProxySupportHttpGet(t *testing.T) {
+func testProxySupportHttpGet(t *testing.T) {
 
 	reqHeaders := make(map[string][]string)
 	reqHeaders["Content-Type"] = []string{"application/json"}
@@ -68,7 +74,7 @@ func TestProxySupportHttpGet(t *testing.T) {
 
 }
 
-func TestProxySupportHttpPost(t *testing.T) {
+func testProxySupportHttpPost(t *testing.T) {
 	resp, err := httpPost("http://localhost:8080")
 
 	if err != nil {
@@ -85,7 +91,7 @@ func TestProxySupportHttpPost(t *testing.T) {
 	}
 }
 
-func TestProxySupportHttpPut(t *testing.T) {
+func testProxySupportHttpPut(t *testing.T) {
 	resp, err := httpPut("http://localhost:8080")
 
 	if err != nil {
@@ -212,7 +218,7 @@ func (s *TestServerHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request)
 func createTestServer() http.Server {
 	address := "localhost:9090"
 	handler := &TestServerHandler{}
-	fmt.Println("HTTP server is listening on", address)
+	fmt.Println("Test HTTP server is listening on", address)
 	server := http.Server{Addr: address, Handler: handler}
 	return server
 }
